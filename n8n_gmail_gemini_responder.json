@@ -1,0 +1,137 @@
+{
+  "name": "AI Email Responder with Gemini (Raw Gmail Decode)",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerOn": "newMessage",
+        "includeRawContent": true,
+        "labelIds": []
+      },
+      "id": "1",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "function extractBody(payload) {\n  if (!payload) return \"\";\n\n  // Case 1: body exists directly\n  if (payload.body && payload.body.data) {\n    return Buffer.from(payload.body.data, \"base64\").toString(\"utf-8\");\n  }\n\n  // Case 2: check nested parts\n  if (payload.parts) {\n    for (const part of payload.parts) {\n      const text = extractBody(part);\n      if (text) return text;\n    }\n  }\n\n  return \"\";\n}\n\n// Extract subject from headers\nlet subject = \"No Subject\";\nif ($json.payload && $json.payload.headers) {\n  const header = $json.payload.headers.find(h => h.name === \"Subject\");\n  if (header && header.value) {\n    subject = header.value;\n  }\n}\n\n// Decode body\nconst body = extractBody($json.payload);\n\n// Extract sender email if available\nlet from = \"unknown\";\nif ($json.payload && $json.payload.headers) {\n  const header = $json.payload.headers.find(h => h.name === \"From\");\n  if (header && header.value) {\n    from = header.value;\n  }\n}\n\nreturn {\n  json: {\n    subject,\n    body: body || \"No Body Found\",\n    from\n  }\n};"
+      },
+      "id": "2",
+      "name": "Function Decode Email",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        "options": {},
+        "authentication": "headerAuth",
+        "sendBody": true,
+        "jsonParameters": true,
+        "headerParametersJson": "{ \"Content-Type\": \"application/json\" }",
+        "queryParametersJson": "{ \"key\": \"YOUR_GEMINI_API_KEY\" }",
+        "bodyParametersJson": "{ \"contents\": [ { \"parts\": [ { \"text\": \"Write a professional and polite reply to this email:\\n\\nSubject: {{$json.subject}}\\n\\nBody: {{$json.body}}\" } ] } ] }"
+      },
+      "id": "3",
+      "name": "Gemini API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "toList": [
+          "={{$json[\"from\"]}}"
+        ],
+        "subject": "Re: {{$json.subject}}",
+        "message": "={{$json[\"candidates\"][0][\"content\"][\"parts\"][0][\"text\"]}}"
+      },
+      "id": "4",
+      "name": "Gmail Send Reply",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        950,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "sheetId": "YOUR_SHEET_ID",
+        "range": "Sheet1!A:D",
+        "options": {},
+        "fields": "values",
+        "valueInputMode": "RAW",
+        "columns": [
+          "Date",
+          "From",
+          "Subject",
+          "Reply"
+        ],
+        "values": "={{[ new Date().toISOString(), $json[\"from\"], $json[\"subject\"], $json[\"candidates\"][0][\"content\"][\"parts\"][0][\"text\"] ]}}"
+      },
+      "id": "5",
+      "name": "Google Sheets Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Function Decode Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function Decode Email": {
+      "main": [
+        [
+          {
+            "node": "Gemini API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini API": {
+      "main": [
+        [
+          {
+            "node": "Gmail Send Reply",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
