@@ -37,7 +37,7 @@
         "sendBody": true,
         "jsonParameters": true,
         "headerParametersJson": "{ \"Content-Type\": \"application/json\" }",
-        "queryParametersJson": "{ \"key\": \"YOUR_GEMINI_API_KEY\" }",
+        "queryParametersJson": "{ \"key\": \"<REPLACE_WITH_YOUR_GEMINI_API_KEY>\" }",
         "bodyParametersJson": "{ \"contents\": [ { \"parts\": [ { \"text\": \"Write a professional and polite reply to this email:\\n\\nSubject: {{$json.subject}}\\n\\nBody: {{$json.body}}\" } ] } ] }"
       },
       "id": "3",
@@ -71,7 +71,7 @@
     {
       "parameters": {
         "operation": "append",
-        "sheetId": "YOUR_SHEET_ID",
+        "sheetId": "<REPLACE_WITH_YOUR_SHEET_ID>",
         "range": "Sheet1!A:D",
         "options": {},
         "fields": "values",
